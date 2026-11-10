@@ -48,4 +48,4 @@ article's Methods.
 
 ## Licence and citation
 
-MIT licence (see `LICENSE`). Please cite the article (see `CITATION.cff`).
+MIT licence (see `LICENSE`). Please cite the article (see `CITATION.cff`). The code version used in the article is archived at https://doi.org/10.5281/zenodo.24120589.

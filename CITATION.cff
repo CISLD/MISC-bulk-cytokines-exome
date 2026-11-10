@@ -3,6 +3,8 @@ message: "If you use this code, please cite the article below."
 title: "Analysis code: Interferon-linked transcription and chromatin accessibility extend to naive T cells in multisystem inflammatory syndrome in children"
 version: "1.0"
 license: MIT
+# Concept DOI (all versions). The article cites release v1.0: 10.5281/zenodo.24120589
+doi: "10.5281/zenodo.24120588"
 authors:
   - {family-names: "Jenko Bizjan", given-names: "Barbara"}
   - {family-names: "Kovač", given-names: "Jernej"}
