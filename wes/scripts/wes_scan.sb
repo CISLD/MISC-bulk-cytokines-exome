@@ -1,0 +1,60 @@
+#!/bin/bash
+#SBATCH --job-name=misc_wes_scan
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=04:00:00
+#SBATCH --output=/path/to/workdir/wes/logs/%x_%j.out
+#SBATCH --error=/path/to/workdir/wes/logs/%x_%j.err
+# Per-patient panel variants (Table S9 genes) for the 11 MIS-C exomes; reads the diagnostic run
+# read-only and writes only under the working directory wes.
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+P="$WORKDIR/wes"
+RUN=/path/to/wes_run
+REFDIR=/path/to/bcbio/genomes/Hsapiens/GRCh37/seq
+REF="$REFDIR/GRCh37.fa"
+BCF=/path/to/containers/depot.galaxyproject.org-singularity-bcftools-1.21--h8b25389_0.img
+SNV_DB="$WORKDIR/hg19_localdb/results/13_duckdb/hg19_snv.duckdb"
+CV_DB="$WORKDIR/gnbs_panel_clinvar/results/01_clinvar/clinvar_20260615.duckdb"
+export APPTAINER_BIND="$RUN,$REFDIR"
+W="$P/work"; R="$P/results"
+bcf() { apptainer exec "$BCF" bcftools "$@"; }
+echo "job $SLURM_JOB_ID on $(hostname), started $(date -Is)"
+
+# 1. normalise, keep PASS non-reference genotypes, extract fields
+inputs=()
+while IFS=$'\t' read -r code lab folder vcf; do
+  [[ "$code" == code ]] && continue
+  # keep only the INFO fields used below; other bcbio fields (e.g. af_exac_all) have malformed counts
+  bcf annotate -x '^INFO/ANN,INFO/gnomAD_AF,INFO/clinvar_sig' -Ou "$vcf" \
+    | bcf norm -m -any -f "$REF" -Ou - \
+    | bcf view -f PASS,. -i 'GT="alt"' -Oz -o "$W/$code.norm.vcf.gz" -
+  bcf index -f -t "$W/$code.norm.vcf.gz"
+  bcf query -f '%CHROM\t%POS\t%REF\t%ALT\t[%GT]\t[%AD]\t[%DP]\t[%GQ]\t%INFO/ANN\t%INFO/gnomAD_AF\t.\t%INFO/clinvar_sig\n' \
+    "$W/$code.norm.vcf.gz" | gzip > "$W/$code.query.tsv.gz"
+  # rename the sample column to the code so merged outputs carry no identifiers
+  echo "$code" > "$W/$code.name"
+  bcf reheader -s "$W/$code.name" -o "$W/$code.recode.vcf.gz" "$W/$code.norm.vcf.gz"
+  bcf index -f -t "$W/$code.recode.vcf.gz"
+  inputs+=("$code=$W/$code.query.tsv.gz")
+done < "$P/sample_key.tsv"
+
+# 2. pairwise genotype discordance on biallelic SNVs called in both samples
+ls "$W"/W*.recode.vcf.gz | sort > "$W/merge_list.txt"
+bcf merge -l "$W/merge_list.txt" -Ou | bcf view -v snps -m2 -M2 -Oz -o "$W/merged_snv.vcf.gz"
+bcf index -f -t "$W/merged_snv.vcf.gz"
+bcf gtcheck -e 0 "$W/merged_snv.vcf.gz" > "$R/gtcheck_pairs.txt" 2> "$W/gtcheck.log" || true
+
+# 3. sample QC: coverage, contamination, sex check
+python3 -I "$P/scripts/wes_qc.py" "$P/sample_key.tsv" "$RUN" "$R/sample_qc.tsv"
+
+# 4. panel variants -> in-house frequency + ClinVar -> tiers
+python3 -I "$P/scripts/wes_panel_variants.py" "$P/panel_genes_S9.tsv" "$R/panel_variants.tsv" "${inputs[@]}"
+sed -e "s#@IN@#$R/panel_variants.tsv#" -e "s#@SNV@#$SNV_DB#" -e "s#@CV@#$CV_DB#" \
+    -e "s#@OUT@#$R/panel_variants_annotated.tsv#" "$P/scripts/wes_annotate.sql" > "$W/annotate.sql"
+"$WORKDIR/bin/duckdb" < "$W/annotate.sql"
+N_CASES=$("$WORKDIR/bin/duckdb" -readonly -noheader -csv "$SNV_DB" -c "SELECT value FROM meta WHERE key='nr_cases'")
+python3 -I "$P/scripts/wes_tiers.py" "$R/panel_variants_annotated.tsv" "$R" "$N_CASES"
+echo "finished $(date -Is)"

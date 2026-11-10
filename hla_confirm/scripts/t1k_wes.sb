@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH --job-name=misc_t1k_wes
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=12:00:00
+#SBATCH --array=1-11
+#SBATCH --output=/path/to/workdir/hla_confirm/logs/%x_%A_%a.out
+#SBATCH --error=/path/to/workdir/hla_confirm/logs/%x_%A_%a.err
+# Second HLA caller on the exomes: T1K 1.0.9 (IPD-IMGT/HLA 3.66.0, genomic sequences, preset hla-wgs)
+# on the same read set OptiType used: MHC region (GRCh37 6:28,477,797-33,448,354) + unmapped pairs.
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+P="$WORKDIR"
+RUN=/path/to/wes_run
+REFDIR=/path/to/bcbio/genomes/Hsapiens/GRCh37/seq
+SAM=/path/to/containers/depot.galaxyproject.org-singularity-samtools-1.21--h50ea8bc_0.img
+T1K="/path/to/containers/t1k_1.0.9.sif"
+export APPTAINER_BIND="$RUN,$REFDIR"
+line=$(awk -F'\t' -v n=$((SLURM_ARRAY_TASK_ID + 1)) 'NR==n' "$P/wes/sample_key.tsv")
+code=$(cut -f1 <<<"$line"); folder=$(cut -f3 <<<"$line")
+cram=$(ls "$RUN"/*/final/"$folder"/*-ready.cram)
+O="$P/hla_confirm/t1k/WES_$code"; mkdir -p "$O"
+echo "$code: job $SLURM_JOB_ID on $(hostname), started $(date -Is)"
+st() { apptainer exec "$SAM" samtools "$@"; }
+st view -@ 4 -u -T "$REFDIR/GRCh37.fa" "$cram" 6:28477797-33448354 > "$O/mhc.bam"
+st view -@ 4 -u -f 4 -T "$REFDIR/GRCh37.fa" "$cram" '*' > "$O/unmapped.bam"
+st cat -o "$O/combined.bam" "$O/mhc.bam" "$O/unmapped.bam"
+st collate -@ 4 -u -O "$O/combined.bam" "$O/collate_tmp" \
+  | st fastq -@ 4 -F 0x900 -1 "$O/R1.fq" -2 "$O/R2.fq" -0 /dev/null -s /dev/null -n -
+rm -f "$O/mhc.bam" "$O/unmapped.bam" "$O/combined.bam"
+echo "read pairs: $(( $(wc -l < "$O/R1.fq") / 4 ))"
+apptainer exec "$T1K" run-t1k -1 "$O/R1.fq" -2 "$O/R2.fq" --preset hla-wgs -t 4 \
+    -f "$P/hla_confirm/ref/hlaidx/_dna_seq.fa" -o "WES_$code" --od "$O"
+rm -f "$O/R1.fq" "$O/R2.fq" "$O"/*_candidate_*.fq
+grep -E "HLA-(A|B|C)\b" "$O/WES_${code}_genotype.tsv" || true
+echo "finished $(date -Is)"

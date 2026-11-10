@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --job-name=misc_figures
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=96G
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+# Figures 2-8 and Supplementary Figure S4 of the article. Figure 1 is a BioRender drawing.
+# Inputs: the results/ tree written by the analysis jobs of both repositories (clone both into WORKDIR),
+# the Harmony-integrated Seurat object with UMAP, and a de-identified patient key (file code -> article
+# code; not part of the repository).
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+P="$WORKDIR"; R="$P/results"; B="$P/figures"; mkdir -p "$B"
+SC=/path/to/FigR/SC_GEX-ATAC.sif                      # R: Seurat, Signac, edgeR, limma, chromVAR, FigR, ggplot2
+MPL=/path/to/containers/matplotlib_3.5.1.sif          # Python 3 with matplotlib 3.5.1
+export APPTAINER_BIND="/path/to/FigR"
+export APPTAINERENV_FONTCONFIG_FILE="$WORKDIR/fonts/fonts.conf"   # optional: fonts with Greek glyphs
+# Figures 2-5 (fgsea installed in a separate R library, last argument)
+apptainer exec $SC Rscript "$P/scripts/rev/figures_article_v6.R" \
+  "$P" /path/to/FigR/UMAP_plots/harmonized_seurat_with_harmony_umap.rds "$B" /path/to/R_libs
+# Figure 6A (STAT motifs) and Figure 7 (public cohorts)
+apptainer exec $MPL python3 -I "$P/scripts/rev/make_figures_v6.py" "$R" /path/to/patient_key.tsv "$B" 6A 7
+# Figure 6B-C and Supplementary Figure S4 (FigR), then Figure 6 on one page
+apptainer exec $SC Rscript "$P/scripts/rev/figr_figure6_v8.R" \
+  "$R/figr_differential/CD8_TEM_differential_edges.tsv" "$R/figr_differential/gdT_differential_edges.tsv" \
+  /path/to/Table_S8a_gene_panels.tsv "$R/figr_three_level/SUMMARY.tsv" "$B/Figure6_FigR"
+apptainer exec $MPL python3 -I "$P/scripts/rev/figure6_composite_v6.py" \
+  "$B/Figure6A_STAT_motifs.png" "$B/Figure6_FigR_BC.png" "$B/Figure6_chromatin"
+# Figure 8 (working model with values from the paired pseudobulk and chromVAR results)
+apptainer exec $MPL python3 -I "$P/scripts/rev/figure8_v8.py" \
+  "$R/pseudobulk_followup/key_gene_panel_pseudobulk.tsv" \
+  "$R/chromvar_naive_extension/motif_deviation_flare_vs_remission.tsv" "$B/Figure8_model"
+ls -la "$B"

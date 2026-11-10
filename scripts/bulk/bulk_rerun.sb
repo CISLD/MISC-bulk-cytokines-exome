@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --job-name=misc_bulk_rerun
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16G
+#SBATCH --time=01:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+export APPTAINER_BIND="/path/to/MISC/RNAseq_MISC"
+PROJ="$WORKDIR"
+B=/path/to/MISC/RNAseq_MISC/RNA_barbara
+apptainer exec "/path/to/containers/bioconductor-deseq2_1.46.0.sif" Rscript --vanilla "$PROJ/scripts/bulk/bulk_rerun.R" \
+  $B/SC_salmon/SALMON/start_enviorment.RData \
+  $B/validation_salmon_2/SALMON/start_enviorment.RData \
+  "$WORKDIR/autoresearch/iterations/iteration6/results/it6_composition.tsv" \
+  "$PROJ/tables_extracted/AF2__16_Table_S7.tsv" \
+  "$PROJ/results/bulk_rerun"

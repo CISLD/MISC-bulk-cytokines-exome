@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --job-name=misc_comparators
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=32G
+#SBATCH --time=01:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+export APPTAINER_BIND="/path/to/FigR"
+PROJ="$WORKDIR"
+cd "$PROJ/scripts/rev"
+apptainer exec /path/to/FigR/SC_GEX-ATAC.sif \
+    Rscript --vanilla "$PROJ/scripts/rev/public_comparators.R" \
+            "$PROJ/public_data/geo_data" "$PROJ/public_data/geo_meta" "$PROJ/results/public_comparators"

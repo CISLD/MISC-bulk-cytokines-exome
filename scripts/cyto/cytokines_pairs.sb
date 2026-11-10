@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --job-name=misc_cytokines_pairs
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+#SBATCH --time=01:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+# Cytokines restricted to the 8 complete flare-remission pairs (authors, 22 Oct 2026: the 5 unpaired
+# flare samples S9, S38, S39, S40, S44 are excluded). Reuses wells_long.tsv from cytokines.sb.
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+export APPTAINER_BIND="/path/to/FigR"
+PROJ="$WORKDIR"
+IN="$PROJ/results/cytokines/wells_long.tsv"
+OUT="$PROJ/results/cytokines_pairs_only"
+mkdir -p "$OUT/sensitivity_without_S6_pair"
+awk -F'\t' 'NR == 1 || $5 != ""' "$IN" > "$OUT/wells_long_pairs.tsv"
+apptainer exec /path/to/FigR/SC_GEX-ATAC.sif \
+    Rscript "$PROJ/scripts/cyto/cytokines_analysis.R" "$OUT/wells_long_pairs.tsv" "$OUT" 10000
+apptainer exec /path/to/FigR/SC_GEX-ATAC.sif \
+    Rscript "$PROJ/scripts/cyto/cytokines_analysis.R" "$OUT/wells_long_pairs.tsv" "$OUT/sensitivity_without_S6_pair" 10000 S6
+python3 -I "$PROJ/scripts/cyto/cytokines_table_s2_pairs.py" "$OUT/cytokines_primary_LODsqrt2.tsv" \
+    "$OUT/sensitivity_without_S6_pair/cytokines_primary_LODsqrt2.tsv" "$OUT/Table_S2_revised.tsv"
+apptainer exec /path/to/FigR/SC_GEX-ATAC.sif \
+    Rscript "$PROJ/scripts/cyto/cytokines_figure2_pairs.R" "$OUT/sample_values_DIL2X.tsv" \
+    "$OUT/cytokines_primary_LODsqrt2.tsv" "$OUT/Figure2_revised"

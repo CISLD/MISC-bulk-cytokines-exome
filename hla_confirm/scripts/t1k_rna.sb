@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --job-name=misc_t1k_rna
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=24G
+#SBATCH --time=24:00:00
+#SBATCH --array=1-22%6
+#SBATCH --output=/path/to/workdir/hla_confirm/logs/%x_%A_%a.out
+#SBATCH --error=/path/to/workdir/hla_confirm/logs/%x_%A_%a.err
+# Independent assay: HLA typing from whole-blood bulk RNA-seq (flare and remission sample of each
+# WES patient), T1K 1.0.9, IPD-IMGT/HLA 3.66.0 mRNA sequences, preset hla. Rows without a FASTQ skip.
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+P="$WORKDIR"
+FQ=/path/to/fastq_rnaseq
+T1K="/path/to/containers/t1k_1.0.9.sif"
+export APPTAINER_BIND="$FQ"
+line=$(awk -F'\t' -v n=$((SLURM_ARRAY_TASK_ID + 1)) 'NR==n' "$P/hla_confirm/rna_key.tsv")
+code=$(cut -f1 <<<"$line"); cond=$(cut -f4 <<<"$line"); r1=$(cut -f7 <<<"$line")
+if [ -z "$r1" ]; then echo "$code $cond: no bulk RNA FASTQ, skipped"; exit 0; fi
+r2=${r1/_R1.fastq.gz/_R2.fastq.gz}
+O="$P/hla_confirm/t1k/RNA_${code}_${cond}"; mkdir -p "$O"
+echo "$code $cond: job $SLURM_JOB_ID on $(hostname), started $(date -Is)"
+apptainer exec "$T1K" run-t1k -1 "$r1" -2 "$r2" --preset hla -t 8 \
+    -f "$P/hla_confirm/ref/hlaidx/_rna_seq.fa" -o "RNA_${code}_${cond}" --od "$O"
+rm -f "$O"/*_candidate_*.fq
+grep -E "HLA-(A|B|C)\b" "$O/RNA_${code}_${cond}_genotype.tsv" || true
+echo "finished $(date -Is)"

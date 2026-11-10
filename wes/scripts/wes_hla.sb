@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH --job-name=misc_wes_hla
+#SBATCH --partition=all
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=12G
+#SBATCH --time=12:00:00
+#SBATCH --array=1-11
+#SBATCH --output=/path/to/workdir/wes/logs/%x_%A_%a.out
+#SBATCH --error=/path/to/workdir/wes/logs/%x_%A_%a.err
+# HLA class I typing (OptiType 1.3.5, DNA mode) from exome CRAMs: reads in the MHC region
+# (GRCh37 6:28,477,797-33,448,354) plus unmapped reads, kept as pairs.
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+P="$WORKDIR/wes"
+RUN=/path/to/wes_run
+REFDIR=/path/to/bcbio/genomes/Hsapiens/GRCh37/seq
+SAM=/path/to/containers/depot.galaxyproject.org-singularity-samtools-1.21--h50ea8bc_0.img
+OPT="/path/to/containers/optitype_1.3.5.sif"
+export APPTAINER_BIND="$RUN,$REFDIR"
+line=$(awk -F'\t' -v n=$((SLURM_ARRAY_TASK_ID + 1)) 'NR==n' "$P/sample_key.tsv")
+code=$(cut -f1 <<<"$line"); folder=$(cut -f3 <<<"$line")
+cram=$(ls "$RUN"/*/final/"$folder"/*-ready.cram)
+O="$P/hla/$code"; mkdir -p "$O"
+echo "$code: job $SLURM_JOB_ID on $(hostname), started $(date -Is)"
+st() { apptainer exec "$SAM" samtools "$@"; }
+st view -@ 2 -u -T "$REFDIR/GRCh37.fa" "$cram" 6:28477797-33448354 > "$O/mhc.bam"
+st view -@ 2 -u -f 4 -T "$REFDIR/GRCh37.fa" "$cram" '*' > "$O/unmapped.bam"
+st cat -o "$O/combined.bam" "$O/mhc.bam" "$O/unmapped.bam"
+st collate -@ 2 -u -O "$O/combined.bam" "$O/collate_tmp" \
+  | st fastq -@ 2 -F 0x900 -1 "$O/R1.fq" -2 "$O/R2.fq" -0 /dev/null -s /dev/null -n -
+rm -f "$O/mhc.bam" "$O/unmapped.bam" "$O/combined.bam"
+echo "read pairs: $(( $(wc -l < "$O/R1.fq") / 4 ))"
+apptainer exec "$OPT" OptiTypePipeline.py -i "$O/R1.fq" "$O/R2.fq" --dna -v \
+    -c "$P/scripts/optitype_config.ini" -o "$O" -p "$code"
+rm -f "$O/R1.fq" "$O/R2.fq"
+cat "$O/${code}_result.tsv"
+echo "finished $(date -Is)"

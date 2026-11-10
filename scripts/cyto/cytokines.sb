@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --job-name=misc_cytokines
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+#SBATCH --time=01:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+export APPTAINER_BIND="/path/to/FigR,/path/to/MISC/MISC/clanek/Cytokines"
+PROJ="$WORKDIR"
+XLSX=/path/to/MISC/MISC/clanek/Cytokines/Legendplex_MISC_250217.xlsx
+OUT="$PROJ/results/cytokines"
+python3 -I "$PROJ/scripts/cyto/cytokines_parse.py" "$XLSX" "$OUT/wells_long.tsv"
+(cd "$PROJ/scripts/cyto" && python3 cytokines_reconcile.py "$XLSX" "$OUT/wells_long.tsv" "$OUT/grouped_sheet_sources.tsv")
+apptainer exec /path/to/FigR/SC_GEX-ATAC.sif \
+    Rscript "$PROJ/scripts/cyto/cytokines_analysis.R" "$OUT/wells_long.tsv" "$OUT" 10000
+# sensitivity: drop the pair whose flare sample has poor duplicate agreement
+apptainer exec /path/to/FigR/SC_GEX-ATAC.sif \
+    Rscript "$PROJ/scripts/cyto/cytokines_analysis.R" "$OUT/wells_long.tsv" "$OUT/sensitivity_without_S6_pair" 10000 S6
+python3 -I "$PROJ/scripts/cyto/cytokines_table_s2.py" "$OUT/cytokines_primary_LODsqrt2.tsv" \
+    "$OUT/sensitivity_without_S6_pair/cytokines_primary_LODsqrt2.tsv" "$OUT/Table_S2_revised.tsv"
+apptainer exec /path/to/FigR/SC_GEX-ATAC.sif \
+    Rscript "$PROJ/scripts/cyto/cytokines_figure2.R" "$OUT/sample_values_DIL2X.tsv" \
+    "$OUT/cytokines_primary_LODsqrt2.tsv" "$OUT/Figure2_revised"
