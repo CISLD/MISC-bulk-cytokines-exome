@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --job-name=misc_lm22_nnls
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=8G
+#SBATCH --time=00:30:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+# Whole-blood cell fractions (LM22 signature, non-negative least squares) for model C of bulk_rerun.R.
+# Input: Salmon gene TPM of all whole-blood samples (nf-core/rnaseq salmon.merged.gene_tpm.tsv) and LM22.txt
+# (CIBERSORTx website, not included). Any R >= 4.0 without extra packages.
+set -euo pipefail
+WORKDIR=/path/to/workdir
+# container cache/tmp settings go here
+mkdir -p "$WORKDIR/results/lm22_composition"
+apptainer exec /path/to/containers/bioconductor-deseq2_1.46.0.sif Rscript --vanilla "$WORKDIR/scripts/bulk/lm22_nnls_composition.R" \
+  /path/to/star_salmon/salmon.merged.gene_tpm.tsv /path/to/LM22.txt "$WORKDIR/results/lm22_composition/lm22_composition.tsv"

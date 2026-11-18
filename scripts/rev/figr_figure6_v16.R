@@ -1,3 +1,6 @@
+# v16 (2026-11-17): copy of figr_figure6_v11.R. Supplementary Figure S5 = TBX21 targets only: the panel of flare-only
+# associations at three units of analysis (old S5B) is removed with that analysis. S4 unchanged. Argument 4 is still read.
+# v11 (2026-11-16): the heatmaps (former Figure 6B-C) become Supplementary Figure S4, the former S4 becomes S5.
 #!/usr/bin/env Rscript
 # v8 (2026-11-08): Figure 6 keeps panels B-C (heatmaps); the TBX21-target and three-level panels move to
 # Supplementary Figure S4 (A, B). Writes <out_prefix>_BC.* and <out_prefix>_S4.* (A4 portrait page).
@@ -51,8 +54,8 @@ heat <- function(cell, title) {
           strip.text = element_text(face = "bold"), plot.tag = element_text(face = "bold", size = 13))
 }
 
-pA <- heat("CD8 TEM", "B")
-pB <- heat("gdT", "C")
+pA <- heat("CD8 TEM", "A")
+pB <- heat("gdT", "B")
 
 tb <- subset(edges, ct == "CD8 TEM" & Motif == "TBX21" & strong)
 tb <- tb[order(tb$rho_flare), ]
@@ -66,7 +69,7 @@ pC <- ggplot(tb, aes(y = DORC)) +
   geom_text(aes(x = 1.02, label = lab), hjust = 0, size = 2.4, colour = "grey30") +
   scale_colour_manual(values = c(Flare = "#b2182b", Remission = "#2166ac"), name = NULL) +
   scale_x_continuous(limits = c(-0.8, 1.25), breaks = seq(-0.75, 0.75, 0.25)) +
-  labs(tag = "A", x = "Spearman ρ (TBX21 RNA vs DORC score)", y = NULL) +
+  labs(x = "Spearman ρ (TBX21 RNA vs DORC score)", y = NULL) +
   theme_minimal(base_size = 8) +
   theme(legend.position = "bottom", plot.tag = element_text(face = "bold", size = 13), panel.grid.minor = element_blank())
 
@@ -87,12 +90,34 @@ pD <- ggplot(d, aes(unit, n, fill = unit)) +
   theme(axis.text.x = element_text(angle = 20, hjust = 1), plot.tag = element_text(face = "bold", size = 13),
         panel.grid.major.x = element_blank())
 
-fig <- pA / pB
-ggsave(paste0(out, "_BC.pdf"), fig, width = 9, height = 9.5, device = cairo_pdf)
-ggsave(paste0(out, "_BC.png"), fig, width = 9, height = 9.5, dpi = 400)
-s4 <- (pC / pD / plot_spacer()) + plot_layout(heights = c(1.3, 1, 0.9))
-s4 <- wrap_elements(s4) + theme(plot.margin = margin(50, 60, 40, 60))
-ggsave(paste0(out, "_S4.pdf"), s4, width = 8.27, height = 11.69, device = cairo_pdf)
-ggsave(paste0(out, "_S4.png"), s4, width = 8.27, height = 11.69, dpi = 300)
+page <- function(p, title, legend, file) {
+  p <- wrap_elements(p) + theme(plot.margin = margin(10, 40, 30, 40)) +
+    plot_annotation(title = paste(strwrap(title, 72), collapse = "\n"), subtitle = paste(strwrap(legend, 100), collapse = "\n"),
+                    theme = theme(plot.title.position = "plot", plot.title = element_text(face = "bold", size = 10.5),
+                                  plot.subtitle = element_text(size = 8, lineheight = 1.15, margin = margin(4, 0, 6, 0)),
+                                  plot.margin = margin(36, 60, 0, 60)))
+  ggsave(paste0(file, ".pdf"), p, width = 8.27, height = 11.69, device = cairo_pdf)
+  ggsave(paste0(file, ".png"), p, width = 8.27, height = 11.69, dpi = 300)
+}
+page(pA / pB,
+     "Supplementary Figure S4. Transcription factor\u2013target associations in CD8+ TEM and \u03b3\u03b4 T nuclei at flare and remission.",
+     paste("Spearman correlation between smoothed transcription factor RNA expression and DORC accessibility for the most connected motif-supported",
+           "transcription factors in CD8+ TEM (A) and \u03b3\u03b4 T (B) nuclei, at flare (upper rows) and remission (lower rows), with DORCs grouped by panel.",
+           "No association differed between flare and remission after correction (all FDR>0\u00b718). DORC=domain of regulatory chromatin, TEM=effector-memory T."),
+     paste0(out, "_S4"))
+s4 <- (pC / plot_spacer()) + plot_layout(heights = c(1.3, 1.9))
+# 2026-11-12: title and legend printed on the page, as on Supplementary Figures S1-S3 (text = appendix_frontmatter_v8.py legend)
+s4_title <- "Supplementary Figure S5. TBX21 targets in CD8+ TEM cells at flare and remission."
+s4_legend <- paste(
+  "Spearman \u03c1 between smoothed TBX21 RNA and DORC accessibility at remission (blue) and flare (red), with the exact within-patient",
+  "permutation p of the difference (all FDR>0\u00b75). DORC=domain of regulatory chromatin, TEM=effector-memory T.")
+s4 <- wrap_elements(s4) + theme(plot.margin = margin(10, 60, 40, 60)) +
+  plot_annotation(title = paste(strwrap(s4_title, 72), collapse = "\n"),
+                  subtitle = paste(strwrap(s4_legend, 100), collapse = "\n"),
+                  theme = theme(plot.title.position = "plot", plot.title = element_text(face = "bold", size = 10.5),
+                                plot.subtitle = element_text(size = 8, lineheight = 1.15, margin = margin(4, 0, 6, 0)),
+                                plot.margin = margin(36, 60, 0, 60)))
+ggsave(paste0(out, "_S5.pdf"), s4, width = 8.27, height = 11.69, device = cairo_pdf)
+ggsave(paste0(out, "_S5.png"), s4, width = 8.27, height = 11.69, dpi = 300)
 
 cat("TBX21 targets:", nrow(tb), "\n")

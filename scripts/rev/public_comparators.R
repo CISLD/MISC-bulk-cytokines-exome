@@ -1,6 +1,6 @@
 # Specificity of the flare transcriptional pattern: public paediatric comparator cohorts.
 #
-# Question (reviewers R1.3, R1.5, R2.9, R3.3): is the BATF/STAT1/PRDM1(/IRF4) induction,
+# Question: is the BATF/STAT1/PRDM1(/IRF4) induction,
 # STAT4 reduction and IFNG/IFNG-AS1 pattern specific to MIS-C, or shared with other acute
 # paediatric inflammation?
 #
@@ -81,7 +81,10 @@ analyse <- function(name, E, group, control, whole_blood) {
       modres[[paste(lv, adj)]] <- data.frame(dataset = name, contrast = paste(lv, "vs", control),
                                              composition_adjusted = adj, module_mean_z_cases = mean(ms[group == lv]),
                                              delta = mfit$coefficients[1, cf], P = mfit$p.value[1, cf],
-                                             n_cases = sum(group == lv), n_controls = sum(ctl))
+                                             n_cases = sum(group == lv), n_controls = sum(ctl),
+                                             SE = mfit$stdev.unscaled[1, cf] * sqrt(mfit$s2.post[1]), df = mfit$df.total[1],
+                                             CI95_low = mfit$coefficients[1, cf] - qt(0.975, mfit$df.total[1]) * mfit$stdev.unscaled[1, cf] * sqrt(mfit$s2.post[1]),
+                                             CI95_high = mfit$coefficients[1, cf] + qt(0.975, mfit$df.total[1]) * mfit$stdev.unscaled[1, cf] * sqrt(mfit$s2.post[1]))
     }
   }
   list(genes = do.call(rbind, res), module = do.call(rbind, modres))

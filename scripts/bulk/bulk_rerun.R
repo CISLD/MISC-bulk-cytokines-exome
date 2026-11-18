@@ -7,7 +7,7 @@
 #     differently spelled Patient_IDs, so the published design treats them as two
 #     unpaired individuals)
 #  C  composition-adjusted model: ~ Patient_ID + neutrophil + lymphocyte + Condition,
-#     using LM22 NNLS fractions estimated from the same samples
+#     using LM22 NNLS fractions estimated from the same samples (lm22_nnls_composition.R)
 #
 # Patient identifiers are never written out: pairs are recoded as pair_01, pair_02, ...
 #

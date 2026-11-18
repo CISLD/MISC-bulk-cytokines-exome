@@ -1,3 +1,7 @@
+# v21 (2026-11-18): copy of figure8_v12.py. CD8 TEM IFNG-AS1 marked suggestive (FDR 0.045, not significant after ambient RNA
+# correction), summary line updated, motif footnote points to the depth-controlled analysis (Supplementary Table S8g).
+# v12 (2026-11-17): copy of figure8_v11b.py, footnote uses the full names of both expression filters.
+# v11b (2026-11-16): copy of figure8_v11.py with a shorter RNA footnote (the v11 line ran off the page).
 #!/usr/bin/env python3
 """Figure 8, v8: figure8_v6.py with a new bottom panel for naive CD4+ and
 CD8+ T cells (RNA: paired pseudobulk; chromatin: STAT1/STAT4 chromVAR motif deviation, pre-declared extension in
@@ -18,7 +22,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse, FancyArrowPatch, FancyBboxPatch
 
-src, motif_src, prefix = sys.argv[1:4]
+src, motif_src, design_src, prefix = sys.argv[1:5]
+# v11: no panel FDR. Genes below the primary expression filter take the genome-wide FDR of the alternative
+# full-design filter analysis (marked ‡) if they pass that filter, otherwise "nt" (not tested).
+ALT = {}
+with open(design_src) as fh:
+    for r in csv.DictReader(fh, delimiter="\t"):
+        if r["passed_design_filter"] == "TRUE" and r["FDR_genomewide"] not in ("NA", ""):
+            ALT[(r["cell_type"], r["gene"])] = float(r["FDR_genomewide"])
 MOT = {}
 with open(motif_src) as fh:
     for r in csv.DictReader(fh, delimiter="\t"):
@@ -35,10 +46,13 @@ def val(ct, gene, label=None):
     r = PB[(ct, gene)]
     fc = float(r["logFC"])
     gw = r["FDR_genomewide"]
-    s = stars(float(gw)) if gw not in ("NA", "") else ""
-    if not s:
-        s = stars(float(r["FDR_panel"]))
-        s = s + "†" if s else " (ns)"
+    if gw not in ("NA", ""):
+        s = stars(float(gw)) or " (ns)"
+    elif (ct, gene) in ALT:
+        s = stars(ALT[(ct, gene)])
+        s = s + "‡" if s else " (ns)"
+    else:
+        s = " (nt)"
     return f"{label or gene} {fc:+.2f}{s}"
 
 TXT, GREY, FADE = "#222222", "#666666", "#aaaaaa"
@@ -121,7 +135,7 @@ arrow(34.5, 111.5, nx, ny + 19.8, rad=-0.05)
 arrow(58, 113.6, gx - 4, gy + 20.4, color=FADE)
 
 # CD8 TEM
-header(cx, cy + 15, "CD8⁺ TEM", GREEN, "T-bet-associated effector chromatin (flare and remission)", w=20)
+header(cx, cy + 15, "CD8⁺ TEM", GREEN, w=20)
 signalling(cx, cy, "CD8 TEM", ["STAT1"])
 ax.text(cx, cy + 2.6, val("CD8 TEM", "STAT4") + "  ·  STAT-family motifs ↑ (10/10)", ha="center",
         fontsize=5.6, color=GREY)
@@ -129,7 +143,8 @@ box(cx, cy - 1.8, 17, 2.2, "TBX21  RNA unchanged", fc="#fff8e1", ec=ORANGE, fs=6
 for i, g in enumerate(["BATF", "STAT1", "PRDM1", "IRF4"]):
     ax.text(cx - 12, cy - 5.0 - i * 2.0, val("CD8 TEM", g), fontsize=6.3)
 ax.text(cx + 4, cy - 6.0, val("CD8 TEM", "IFNG") + " ↑", fontsize=6.3, color=RED, weight="bold")
-ax.text(cx + 4, cy - 8.2, val("CD8 TEM", "IFNG-AS1") + " ↓", fontsize=6.3, color=BLUE, weight="bold")
+ax.text(cx + 4, cy - 8.2, val("CD8 TEM", "IFNG-AS1") + " ↓", fontsize=6.3, color=BLUE)
+ax.text(cx + 4, cy - 10.0, "suggestive (ns after ambient correction)", fontsize=5.0, color=GREY)
 arrow(cx - 1, cy - 7.5, cx + 3.5, cy - 6.6, color=GREEN)
 box(cx, cy - 21, 34, 7.5,
     "Effector and checkpoint output\n"
@@ -144,12 +159,10 @@ signalling(gx, gy, "gdT", ["STAT1", "STAT3"])
 ax.text(gx, gy + 2.6, val("gdT", "STAT4") + "  ·  STAT-family motifs ↑ (10/10)", ha="center",
         fontsize=5.6, color=GREY)
 for i, g in enumerate(["STAT1", "STAT3", "PRDM1", "BATF", "JUNB"]):
-    lab = val("gdT", g) + (" (low expr.)" if g == "BATF" else "")
+    lab = val("gdT", g)
     ax.text(gx - 11.5, gy - 2.2 - i * 1.95, lab, fontsize=6.0)
 ax.text(gx + 3, gy - 5.0, val("gdT", "IFNG") + " ↑", fontsize=6.3, color=RED, weight="bold")
 ax.text(gx + 3, gy - 7.2, val("gdT", "IFNG-AS1") + " ↓", fontsize=6.3, color=BLUE, weight="bold")
-box(gx, gy - 19, 30, 2.8, "NFKB1 ↓ / KLF3 ↑ module associations (exploratory)", ec=FADE, ls="--",
-    fs=6.0, color=GREY)
 
 # NK
 header(nx, ny + 14, "NK cell", BLUE, w=14)
@@ -170,7 +183,7 @@ ax.add_patch(Ellipse((mx, my), 22, 11, fc="#fdf2e9", ec=ORANGE, lw=1.2, zorder=1
 ax.text(mx, my + 3.0, "CD14⁺ monocyte", ha="center", fontsize=8, weight="bold")
 ax.text(mx, my + 0.6, "IFN-γ-responsive", ha="center", fontsize=6.8)
 ax.text(mx, my - 1.6, val("CD14 Mono", "STAT1") + " ↑", ha="center", fontsize=6.8)
-ax.text(mx, my - 3.6, "PD-L1 ↑ (cell-level only)", ha="center", fontsize=6.3, color=GREY)
+# v10: "PD-L1 (cell-level only)" removed, CD274 is not significant in the patient-level analysis
 px, py = 53.5, 75
 ax.add_patch(Ellipse((px, py), 8, 4, fc="#fdecea", ec=RED, lw=1.0, zorder=3))
 ax.text(px, py, "IFN-γ", ha="center", va="center", fontsize=7.5, color=RED, weight="bold", zorder=4)
@@ -217,27 +230,27 @@ arrow(54.5, 38.5, 59.5, 37.0, color=RED, rad=-0.1)
 # Context: regulatory T and naive B cells
 tm1, tn = motif("Treg", "STAT1")
 tm4, _ = motif("Treg", "STAT4")
-box(26, 15.6, 40, 3.4, f"Regulatory T cells: same pattern\n{val('Treg', 'STAT1')} RNA; STAT1 motif {tm1.split()[1]}, "
+box(26, 15.6, 40, 3.4, f"Regulatory T cells: same pattern\n{val('Treg', 'STAT1')} RNA, STAT1 motif {tm1.split()[1]}, "
     f"STAT4 motif {tm4.split()[1]} ({tn})", ec="#5e35b1", fs=5.8)
 bm1, bn = motif("B naive", "STAT1")
 bm4, _ = motif("B naive", "STAT4")
-box(74, 15.6, 40, 3.4, f"Naive B cells: RNA only\n{val('B naive', 'STAT1')}, {val('B naive', 'GBP1')} RNA; "
+box(74, 15.6, 40, 3.4, f"Naive B cells: RNA only\n{val('B naive', 'STAT1')}, {val('B naive', 'GBP1')} RNA, "
     f"STAT motifs not significant", ec=GREY, fs=5.8, color=GREY)
 
 # Bottom box and legend
 box(50, 9.9, 88, 4.6,
     "STAT1 and IL6ST ↑ in CD8⁺ TEM, NK, γδ T and naive T cells · STAT-family motif accessibility ↑ in effector and naive T cells\n"
-    "IFNG-AS1 ↓ in CD8⁺ TEM and γδ T cells · upstream signal(s) unresolved",
+    "IFNG-AS1 ↓ in γδ T and naive T cells (CD8⁺ TEM suggestive) · upstream signal(s) unresolved",
     fc="#fdf2e9", ec=RED, fs=7.0, weight="bold")
 ax.text(5, 5.2, "↑ / ↓ with value: measured change", fontsize=6.3, va="center")
 ax.plot([33, 39], [5.2, 5.2], color=TXT, lw=1.1, ls=(0, (3, 2)))
-ax.text(40, 5.2, "arrows: inferred / not measured (receptor signalling; STAT phosphorylation not measured)",
+ax.text(40, 5.2, "arrows: inferred / not measured (receptor signalling and STAT phosphorylation not measured)",
         fontsize=6.3, va="center")
-ax.text(5, 3.1, "RNA: log₂FC flare vs remission, paired pseudobulk; * FDR < 0.05, ** < 0.01, *** < 0.001 "
-        "(genome-wide); † FDR within the targeted (post hoc) gene panel; ns, not significant",
+ax.text(5, 3.1, "RNA: log₂FC, paired pseudobulk. * FDR < 0.05, ** < 0.01, *** < 0.001 "
+        "(genome-wide), ‡ alternative full-design filter (genes below the primary expression filter), ns not significant, nt not tested",
         fontsize=5.8, va="center", color=GREY)
-ax.text(5, 1.2, "Motifs: chromVAR deviation z difference, flare vs remission (ATAC pseudobulk); stars as above, FDR within cell type; "
-        "STAT1, STAT3, STAT4 and STAT5 motifs are near-identical",
+ax.text(5, 1.2, "Motifs: chromVAR deviation z difference, flare vs remission (ATAC pseudobulk). Stars as above, FDR within cell type. "
+        "STAT1, STAT3, STAT4, STAT5 motifs near-identical · depth-controlled: Table S8g",
         fontsize=5.8, va="center", color=GREY)
 
 fig.savefig(prefix + ".pdf")

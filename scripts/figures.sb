@@ -6,7 +6,8 @@
 #SBATCH --time=02:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
-# Figures 2-8 and Supplementary Figure S4 of the article. Figure 1 is a BioRender drawing.
+# Figures 1-8 and Supplementary Figures S4-S5 of the article. Figure 1 is a BioRender drawing: figure1_v21.py only
+# changes labels and numbers in the BioRender PDF (not included).
 # Inputs: the results/ tree written by the analysis jobs of both repositories (clone both into WORKDIR),
 # the Harmony-integrated Seurat object with UMAP, and a de-identified patient key (file code -> article
 # code; not part of the repository).
@@ -18,19 +19,29 @@ SC=/path/to/FigR/SC_GEX-ATAC.sif                      # R: Seurat, Signac, edgeR
 MPL=/path/to/containers/matplotlib_3.5.1.sif          # Python 3 with matplotlib 3.5.1
 export APPTAINER_BIND="/path/to/FigR"
 export APPTAINERENV_FONTCONFIG_FILE="$WORKDIR/fonts/fonts.conf"   # optional: fonts with Greek glyphs
-# Figures 2-5 (fgsea installed in a separate R library, last argument)
-apptainer exec $SC Rscript "$P/scripts/rev/figures_article_v6.R" \
-  "$P" /path/to/FigR/UMAP_plots/harmonized_seurat_with_harmony_umap.rds "$B" /path/to/R_libs
-# Figure 6A (STAT motifs) and Figure 7 (public cohorts)
-apptainer exec $MPL python3 -I "$P/scripts/rev/make_figures_v6.py" "$R" /path/to/patient_key.tsv "$B" 6A 7
-# Figure 6B-C and Supplementary Figure S4 (FigR), then Figure 6 on one page
-apptainer exec $SC Rscript "$P/scripts/rev/figr_figure6_v8.R" \
+L=/path/to/R_libs                                     # optional extra R library, last argument (all packages are in $SC)
+# Figures 2 and 5
+apptainer exec $SC Rscript "$P/scripts/rev/figures_article_v11.R" "$P" "$B" $L
+# Figure 3 (UMAP, composition)
+apptainer exec $SC Rscript "$P/scripts/rev/figure3_v8.R" \
+  "$P" /path/to/FigR/UMAP_plots/harmonized_seurat_with_harmony_umap.rds "$B" $L
+# Figure 4 (camera; whole-blood salmon count files as in scripts/bulk/bulk_rerun.sb)
+apptainer exec $SC Rscript "$P/scripts/rev/figure4_camera_v11.R" "$P" "$B" $L \
+  /path/to/RNA_seq/SC_salmon/SALMON/start_enviorment.RData \
+  /path/to/RNA_seq/validation_salmon_2/SALMON/start_enviorment.RData
+# Figure 6 (STAT motifs)
+apptainer exec $MPL python3 -I "$P/scripts/rev/make_figure6_v11.py" "$R" /path/to/patient_key.tsv "$B" 6A
+# Figure 7 (public cohorts, 95% CI)
+apptainer exec $MPL python3 -I "$P/scripts/rev/figure7_v21.py" "$R/public_comparators/comparator_module_score.tsv" "$B"
+# Supplementary Figures S4 (FigR heatmaps) and S5 (TBX21 targets)
+apptainer exec $SC Rscript "$P/scripts/rev/figr_figure6_v16.R" \
   "$R/figr_differential/CD8_TEM_differential_edges.tsv" "$R/figr_differential/gdT_differential_edges.tsv" \
-  /path/to/Table_S8a_gene_panels.tsv "$R/figr_three_level/SUMMARY.tsv" "$B/Figure6_FigR"
-apptainer exec $MPL python3 -I "$P/scripts/rev/figure6_composite_v6.py" \
-  "$B/Figure6A_STAT_motifs.png" "$B/Figure6_FigR_BC.png" "$B/Figure6_chromatin"
+  /path/to/Table_S8a_gene_panels.tsv "$R/figr_three_level/SUMMARY.tsv" "$B/FigR"
 # Figure 8 (working model with values from the paired pseudobulk and chromVAR results)
-apptainer exec $MPL python3 -I "$P/scripts/rev/figure8_v8.py" \
+apptainer exec $MPL python3 -I "$P/scripts/rev/figure8_v21.py" \
   "$R/pseudobulk_followup/key_gene_panel_pseudobulk.tsv" \
-  "$R/chromvar_naive_extension/motif_deviation_flare_vs_remission.tsv" "$B/Figure8_model"
+  "$R/chromvar_naive_extension/motif_deviation_flare_vs_remission.tsv" \
+  "$R/pseudobulk_designfilter_panel/key_genes_designfilter_panel.tsv" "$B/Figure8_model"
+# Figure 1 (labels and analysed pairs in the BioRender drawing)
+python3 -I "$P/scripts/rev/figure1_v21.py" /path/to/Figure1_biorender.pdf "$B/Figure1_study_design_biorender.pdf"
 ls -la "$B"

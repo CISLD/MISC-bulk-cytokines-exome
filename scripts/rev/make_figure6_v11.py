@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# v11: Figure 6 is the STAT-motif panel alone (written as Figure6_STAT_motifs, no panel letter). Figure 7 is drawn by
+#      figure7_v21.py.
 """Revised Figures 3, 4, 5, 6A and 7 for the MIS-C manuscript, from the patient-level results.
 
 usage: make_figures_v5.py <results dir> <wes/patient_key.tsv> <out dir> [figure ...]
@@ -350,8 +352,7 @@ def fig6a():
             if s:
                 ax.text(0.5, -0.24, f"FDR {float(s['FDR']):.3f}\n{s['patients_flare_higher']}/{s['n_pairs']} up",
                         transform=ax.transAxes, ha="center", va="top", fontsize=5.8, color=INK2)
-    fig.text(0.01, 0.97, "A", fontsize=12, weight="bold", va="top")
-    save(fig, "Figure6A_STAT_motifs")
+    save(fig, "Figure6_STAT_motifs")
 
 # ---------------------------------------------------------------- Figure 7
 def fig7():
