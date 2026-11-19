@@ -33,10 +33,10 @@ apptainer exec $SC Rscript "$P/scripts/rev/figure4_camera_v11.R" "$P" "$B" $L \
 apptainer exec $MPL python3 -I "$P/scripts/rev/make_figure6_v11.py" "$R" /path/to/patient_key.tsv "$B" 6A
 # Figure 7 (public cohorts, 95% CI)
 apptainer exec $MPL python3 -I "$P/scripts/rev/figure7_v21.py" "$R/public_comparators/comparator_module_score.tsv" "$B"
-# Supplementary Figures S4 (FigR heatmaps) and S5 (TBX21 targets)
+# Supplementary Figures S4 (FigR heatmaps) and S5 (TBX21 targets); input from figr_differential_edges.R (LabenaBioinf)
 apptainer exec $SC Rscript "$P/scripts/rev/figr_figure6_v16.R" \
   "$R/figr_differential/CD8_TEM_differential_edges.tsv" "$R/figr_differential/gdT_differential_edges.tsv" \
-  /path/to/Table_S8a_gene_panels.tsv "$R/figr_three_level/SUMMARY.tsv" "$B/FigR"
+  /path/to/Table_S8a_gene_panels.tsv "$B/FigR"
 # Figure 8 (working model with values from the paired pseudobulk and chromVAR results)
 apptainer exec $MPL python3 -I "$P/scripts/rev/figure8_v21.py" \
   "$R/pseudobulk_followup/key_gene_panel_pseudobulk.tsv" \
